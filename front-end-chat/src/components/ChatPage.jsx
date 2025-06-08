@@ -7,9 +7,17 @@ import toast from "react-hot-toast";
 import { Stomp } from "@stomp/stompjs";
 import { baseURL } from "../config/AxiosHelper";
 import { getMessagess } from "../services/RoomService";
+import { timeAgo } from "../config/helper";
 
 const ChatPage = () => {
-  const { roomId, currentUser, connected } = useChatContext();
+  const {
+    roomId,
+    currentUser,
+    connected,
+    setConnected,
+    setRoomId,
+    setCurrentUser,
+  } = useChatContext();
   // console.log(roomId);
   // console.log(currentUser);
   // console.log(connected);
@@ -22,20 +30,7 @@ const ChatPage = () => {
     }
   }, [connected, roomId, currentUser]);
 
-  const [messages, setMessages] = useState([
-    {
-      content: "ji  ?",
-      sender: "Sadid",
-    },
-    {
-      content: "ho bhalo  ?",
-      sender: "nit ",
-    },
-    {
-      content: "tumi  ?",
-      sender: "kate ",
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const inputRef = useRef(null);
   const chatBoxRef = useRef(null);
@@ -57,6 +52,16 @@ const ChatPage = () => {
     }
   }, []);
 
+  //scroll down
+  useEffect(() => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scroll({
+        top: chatBoxRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [messages]);
+
   // stompclient init
 
   useEffect(() => {
@@ -77,7 +82,9 @@ const ChatPage = () => {
       });
     };
 
-    connectWebSocket();
+    if (connected) {
+      connectWebSocket();
+    }
   }, [roomId]);
 
   // send message handle
@@ -87,7 +94,7 @@ const ChatPage = () => {
       console.log(input);
 
       const message = {
-        member: currentUser,
+        sender: currentUser,
         content: input,
         roomId: roomId,
       };
@@ -103,41 +110,55 @@ const ChatPage = () => {
     //
   };
 
+  function handleLogout() {
+    stompClient.disconnect();
+    setConnected(false);
+    setRoomId("");
+    setCurrentUser("");
+    navigate("/");
+  }
+
   return (
     <div className="">
       <header className="dark:border-gray-700 h-20 fixed w-full dark:bg-gray-900 border py-5 shadow flex justify-around items-center">
         {/* room name  */}
         <div>
           <h1 className="text-3xl font-semibold">
-            Room : <span>Family Room</span>
+            Room : <span>{roomId}</span>
           </h1>
         </div>
         {/* room name  */}
 
         <div>
           <h1 className="text-3xl font-semibold">
-            User : <span>Sadid Room</span>
+            User : <span>{currentUser}</span>
           </h1>
         </div>
         {/* room name  */}
         <div>
-          <button className="dark:bg-red-500 dark:hover:bg-red-700 px-3 py-2 rounded-lg">
+          <button
+            onClick={handleLogout}
+            className="dark:bg-red-500 dark:hover:bg-red-700 px-3 py-2 rounded-lg"
+          >
             Leave Room
           </button>
         </div>
       </header>
 
-      <main className="py-20 px-10 border w-2/3 dark:bg-slate-600 mx-auto h-screen overflow-auto">
+      <main
+        ref={chatBoxRef}
+        className="py-20 px-10 border w-2/3 dark:bg-slate-600 mx-auto h-screen overflow-auto"
+      >
         {messages.map((message, index) => (
           <div
             key={index}
             className={`flex ${
-              message.sender === currentUser ? "justify-end" : "justify-start"
+              message.member === currentUser ? "justify-end" : "justify-start"
             }`}
           >
             <div
               className={`my-2 ${
-                message.sender === currentUser ? "bg-pink-800" : "bg-gray-800"
+                message.member === currentUser ? "bg-pink-800" : "bg-gray-800"
               } p-2 max-w-xs`}
             >
               <div className="flex flex-row gap-2">
@@ -149,6 +170,9 @@ const ChatPage = () => {
                 <div className=" flex flex-col gap-1">
                   <p className="text-sm font-bold">{message.sender}</p>
                   <p>{message.content}</p>
+                  <p className="text-xs text-gray-800">
+                    {timeAgo(message.timeStamp)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -164,6 +188,11 @@ const ChatPage = () => {
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                sendMessage();
+              }
             }}
             type="text"
             placeholder="Type your message.."
